@@ -1,7 +1,54 @@
 import torch
+from torch.utils.data import TensorDataset, DataLoader
+import torch.nn as nn
+import torch.optim as optim
 import pickle
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+## takes in a module and applies the specified weight initialization
+def weights_init_normal(m):
+    '''Takes in a module and initializes all linear layers with weight
+       values taken from a normal distribution.'''
+    # for every Linear layer in a model
+    if isinstance(m, nn.Linear):
+        # m.weight.data shoud be taken from a normal distribution
+        torch.nn.init.xavier_uniform_(m.weight)
+        # m.bias.data should be 0
+        torch.nn.init.zeros_(m.bias)
+
+neurons = [20, 40, 10, 1]
+activations = ['tanh', 'tanh', 'tanh']
+dropouts = [0, 0.4, 0.2]
+class LinearRegressorModel(nn.Module):
+    def __init__(self, input_dim, neurons, activations, dropouts):
+        """
+        Constructor of the multi layer network.
+
+        Arguments:
+            - input_dim {int} -- Number of features in the input (excluding 
+                the batch dimension).
+            - neurons {list} -- Number of neurons in each linear layer 
+                represented as a list. The length of the list determines the 
+                number of linear layers.
+            - activations {list} -- List of the activation functions to apply 
+                to the output of each linear layer.
+        """
+        super(LinearRegressorModel, self).__init__()
+        self.input_dim = input_dim
+        self.neurons = neurons
+        self.activations = activations
+        self.layers = [nn.Linear(self.input_dim, self.neurons[0], bias=True)]
+        activation_abbrev = {'relu': nn.ReLU(), 'sigmoid': nn.Sigmoid(),
+                             'tanh': nn.Tanh(), 'identity':nn.Identity()}
+        for i in range(len(self.neurons)-1):
+            self.layers.append(nn.Dropout(p=dropouts[i], inplace=True))
+            self.layers.append(activation_abbrev[self.activations[i]])
+            self.layers.append(nn.Linear(self.neurons[i], self.neurons[i+1], bias=True))
+        self.model = nn.Sequential(*self.layers)
+    def forward(self, x):
+        return self.model(x)
+
 
 class Regressor():
 
@@ -59,7 +106,48 @@ class Regressor():
 
         # Replace this code with your own
         # Return preprocessed x and y, return None for y if it was None
-        return x, (y if isinstance(y, pd.DataFrame) else None)
+        nominal_column = ['ocean_proximity']
+        numeral_columns = x.columns.difference(nominal_column)
+        missing_column = 'total_bedrooms'
+        # Handle Nominal variable
+        one_hot = pd.get_dummies(x[nominal_column])
+        x = x.join(one_hot)
+        x.drop([*nominal_column], axis=1, inplace=True)
+
+        # Handle Missing values
+        index = x[missing_column].index[x[missing_column].apply(np.isnan)]
+        missing_idx = index.values.tolist()
+        missing_mean = x[missing_column].mean()
+        x.fillna(value=missing_mean, axis=0, inplace=True)
+        # print(missing_mean)
+
+        # Normalising statistics
+        if training:
+            # Standardisation
+            # self.mean = x[numeral_columns].mean()
+            # self.std = x[numeral_columns].std()
+            # x_norm = (x[numeral_columns]-self.mean)/self.std
+            # x[numeral_columns] = x_norm
+
+            # Normalisation
+            self.max = x[numeral_columns].max()
+            self.min = x[numeral_columns].min()
+            x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
+            x[numeral_columns] = x_norm
+        else:
+            # Standardisation
+            # x_norm = (x[numeral_columns]-self.mean)/self.std
+            # x[numeral_columns] = x_norm
+
+            # Normalisation
+            x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
+            x[numeral_columns] = x_norm
+
+        x = torch.tensor(x.values, dtype=torch.float64)
+        if y is not None:
+            y = y/100000
+            y = torch.tensor(y.values, dtype=torch.float64)
+        return x, (y if torch.is_tensor(y) else None)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -85,6 +173,31 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+        dataset = TensorDataset(X, Y)
+        batch_size = 500
+        train_loader = DataLoader(dataset, batch_size, shuffle=True)
+        self.net = LinearRegressorModel(input_dim=13, neurons=neurons, 
+                        activations=activations, dropouts=dropouts).double()
+        self.net.apply(weights_init_normal)
+        self.optimiser = optim.SGD(params=self.net.parameters(), lr=0.01, momentum=0.9)
+        self.loss_fn = nn.MSELoss()
+        self.net.train()
+
+        train_error = 0
+        pbar = tqdm(range(self.nb_epoch))
+        for i in pbar :
+            for j, train_data in enumerate(train_loader):
+                self.optimiser.zero_grad()
+                x, y_true = train_data
+                # print(x, y)pbar.set_postfix({'num_vowels': num_vowels})
+                y_pred = self.net(x)
+                loss = self.loss_fn(y_pred, y_true)
+                loss.backward()
+                train_error += loss.item()
+                self.optimiser.step()
+            train_error /= len(train_loader)
+            pbar.set_postfix({'training loss': train_error})
+
         return self
 
         #######################################################################
@@ -110,7 +223,8 @@ class Regressor():
         #######################################################################
 
         X, _ = self._preprocessor(x, training = False) # Do not forget
-        pass
+        y_pred = self.net(X)
+        return y_pred
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -135,7 +249,23 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        return 0 # Replace this code with your own
+        dataset = TensorDataset(X, Y)
+        batch_size = 500
+        test_loader = DataLoader(dataset, batch_size, shuffle=True)
+        self.loss_fn = nn.MSELoss()
+        self.net.eval()
+
+        pbar = tqdm(enumerate(test_loader))
+        error = 0
+        for j, train_data in pbar:
+            x, y_true = train_data
+            # print(x, y)pbar.set_postfix({'num_vowels': num_vowels})
+            y_pred = self.net(x)
+            loss = self.loss_fn(y_pred, y_true)
+            error += loss.item()
+        error = error/len(test_loader)
+
+        return error # Replace this code with your own
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -191,7 +321,7 @@ def RegressorHyperParameterSearch():
 
 
 def example_main():
-
+    pd.set_option('expand_frame_repr', False)
     output_label = "median_house_value"
 
     # Use pandas to read CSV data as it contains various object types
@@ -207,9 +337,9 @@ def example_main():
     # This example trains on the whole available dataset. 
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 10)
+    regressor = Regressor(x_train, nb_epoch = 50)
     regressor.fit(x_train, y_train)
-    save_regressor(regressor)
+    # save_regressor(regressor)
 
     # Error
     error = regressor.score(x_train, y_train)
