@@ -50,7 +50,7 @@ class Regressor(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(self.input_size, 80),
             nn.ReLU(),
-            nn.Linear(80,60),
+            nn.Linear(80, 60),
             nn.ReLU(),
             nn.Linear(60,20),
             nn.ReLU(),
@@ -123,17 +123,23 @@ class Regressor(nn.Module):
         number_attribute = xc.dtypes[xc.dtypes != 'object'].index
         xc[number_attribute] = (xc[number_attribute]  - mean) / (std)
 
-        #To ensure all the categorical labels in training data are included in the 1-hot(Using mock up rows)
+        #To ensure only all the categorical labels in training data are included in the 1-hot(Using mock up rows)
         ocean_proximity_labels = ocean_proximity_labels.tolist()
         count_append = 0
+        #In case label showed in training data but not in testing data
         for label in ocean_proximity_labels:
             if label not in xc.ocean_proximity.unique():
                 temp = xc.tail(1).copy()
-                temp.loc[0,'ocean_proximity'] = label
+                temp.iloc[0,'ocean_proximity'] = label
                 xc.append(temp)
                 count_append += 1
+        #In case label showed in testing data but not in training data     
+        for row in range(0,xc.shape[0]):
+            if xc.iloc[row,xc.columns.get_loc('ocean_proximity')] not in ocean_proximity_labels:
+                xc.iloc[row,xc.columns.get_loc('ocean_proximity')] = np.nan
+                
         #Convert categorical attribute into 1-hot
-        xc = pd.get_dummies(xc, dummy_na=True)
+        xc = pd.get_dummies(xc)
         #Drop mock up rows
         xc.drop(xc.tail(count_append).index,inplace=True)
 
