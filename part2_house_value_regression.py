@@ -1,11 +1,25 @@
+# Deep learning packages
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 import torch.nn as nn
 import torch.optim as optim
+# Data preprocessing packages
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
+from sklearn.preprocessing import LabelBinarizer, OneHotEncoder
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.model_selection import train_test_split, ParameterGrid, GridSearchCV
+# Other packages
 import pickle
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from sklearn.linear_model import LinearRegression
+print('Import Done')
+
+
+
 ## takes in a module and applies the specified weight initialization
 def weights_init_normal(m):
     '''Takes in a module and initializes all linear layers with weight
@@ -20,6 +34,8 @@ def weights_init_normal(m):
 neurons = [20, 40, 10, 1]
 activations = ['tanh', 'tanh', 'tanh']
 dropouts = [0, 0.4, 0.2]
+param_grid = {'neurons': neurons, 'activations': activations, 'dropouts': dropouts}
+
 class LinearRegressorModel(nn.Module):
     def __init__(self, input_dim, neurons, activations, dropouts):
         """
@@ -70,8 +86,48 @@ class Regressor():
         #                       ** START OF YOUR CODE **
         #######################################################################
 
+        # Find categorical columns
+        cat_col = [i for i in x.columns if x.dtypes[i]=='object']
+        num_col = x.columns.difference(cat_col)
+
+        # Find columns with missing values
+        miss_col = [col for col in x.columns if x[col].isnull().any()]
+
+        # Handle different types of data differently
+        self.cat_pipe = Pipeline([
+                            ('binarizer', OneHotEncoder())
+                            ])
+        self.num_pipe = Pipeline([
+                            ('normaliser', RobustScaler()),
+                            ('imputer', KNNImputer()),
+                            ])
+
+        # Combine two pipes and deal with the whole data
+        self.feature_pipe = ColumnTransformer(
+        transformers=[
+        ('num', self.num_pipe, num_col),
+        ('cat', self.cat_pipe, cat_col)
+        ])
+
+        # We only scale the label to have a max of 1, DONT SHIFT OR CENTER THE DATA
+        self.label_pipe = Pipeline([
+                            ('scaler', MaxAbsScaler())
+                            ])
+
         # Replace this code with your own
         X, _ = self._preprocessor(x, training = True)
+
+
+        # Instantiate network
+        self.net = LinearRegressorModel(input_dim=13, neurons=neurons, 
+                        activations=activations, dropouts=dropouts).double()
+        self.net.apply(weights_init_normal)
+
+        # Define our optimiser and loss functions
+        self.optimiser = optim.SGD(params=self.net.parameters(), lr=0.01, momentum=0.9)
+        self.loss_fn = nn.MSELoss()
+
+
         self.input_size = X.shape[1]
         self.output_size = 1
         self.nb_epoch = nb_epoch 
@@ -103,51 +159,67 @@ class Regressor():
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        # train_pipe = Pipeline()
 
-        # Replace this code with your own
-        # Return preprocessed x and y, return None for y if it was None
-        nominal_column = ['ocean_proximity']
-        numeral_columns = x.columns.difference(nominal_column)
-        missing_column = 'total_bedrooms'
-        # Handle Nominal variable
-        one_hot = pd.get_dummies(x[nominal_column])
-        x = x.join(one_hot)
-        x.drop([*nominal_column], axis=1, inplace=True)
-
-        # Handle Missing values
-        index = x[missing_column].index[x[missing_column].apply(np.isnan)]
-        missing_idx = index.values.tolist()
-        missing_mean = x[missing_column].mean()
-        x.fillna(value=missing_mean, axis=0, inplace=True)
-        # print(missing_mean)
-
-        # Normalising statistics
+        # Only fit for training
         if training:
-            # Standardisation
-            # self.mean = x[numeral_columns].mean()
-            # self.std = x[numeral_columns].std()
-            # x_norm = (x[numeral_columns]-self.mean)/self.std
-            # x[numeral_columns] = x_norm
-
-            # Normalisation
-            self.max = x[numeral_columns].max()
-            self.min = x[numeral_columns].min()
-            x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
-            x[numeral_columns] = x_norm
+            x = self.feature_pipe.fit_transform(x)
+            if y is not None:
+                y = self.label_pipe.fit_transform(y)
         else:
-            # Standardisation
-            # x_norm = (x[numeral_columns]-self.mean)/self.std
-            # x[numeral_columns] = x_norm
+            x = self.feature_pipe.transform(x)
+            if y is not None:
+                y = self.label_pipe.transform(y)
 
-            # Normalisation
-            x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
-            x[numeral_columns] = x_norm
-
-        x = torch.tensor(x.values, dtype=torch.float64)
+        # Change to torch tensor
+        x = torch.tensor(x, dtype=torch.float64)
         if y is not None:
-            y = y/100000
-            y = torch.tensor(y.values, dtype=torch.float64)
+            y = torch.tensor(y, dtype=torch.float64)
         return x, (y if torch.is_tensor(y) else None)
+        # # Replace this code with your own
+        # # Return preprocessed x and y, return None for y if it was None
+        # nominal_column = ['ocean_proximity']
+        # numeral_columns = x.columns.difference(nominal_column)
+        # missing_column = 'total_bedrooms'
+        # # Handle Nominal variable
+        # one_hot = pd.get_dummies(x[nominal_column])
+        # x = x.join(one_hot)
+        # x.drop([*nominal_column], axis=1, inplace=True)
+
+        # # Handle Missing values
+        # index = x[missing_column].index[x[missing_column].apply(np.isnan)]
+        # missing_idx = index.values.tolist()
+        # missing_mean = x[missing_column].mean()
+        # x.fillna(value=missing_mean, axis=0, inplace=True)
+        # # print(missing_mean)
+
+        # # Normalising statistics
+        # if training:
+        #     # Standardisation
+        #     # self.mean = x[numeral_columns].mean()
+        #     # self.std = x[numeral_columns].std()
+        #     # x_norm = (x[numeral_columns]-self.mean)/self.std
+        #     # x[numeral_columns] = x_norm
+
+        #     # Normalisation
+        #     self.max = x[numeral_columns].max()
+        #     self.min = x[numeral_columns].min()
+        #     x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
+        #     x[numeral_columns] = x_norm
+        # else:
+        #     # Standardisation
+        #     # x_norm = (x[numeral_columns]-self.mean)/self.std
+        #     # x[numeral_columns] = x_norm
+
+        #     # Normalisation
+        #     x_norm = (x[numeral_columns]-self.min)/(self.max-self.min)
+        #     x[numeral_columns] = x_norm
+
+        # x = torch.tensor(x.values, dtype=torch.float64)
+        # if y is not None:
+        #     y = y/100000
+        #     y = torch.tensor(y.values, dtype=torch.float64)
+        # return x, (y if torch.is_tensor(y) else None)
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -173,28 +245,39 @@ class Regressor():
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+
         dataset = TensorDataset(X, Y)
         batch_size = 500
+        # Instantiate dataloader
         train_loader = DataLoader(dataset, batch_size, shuffle=True)
-        self.net = LinearRegressorModel(input_dim=13, neurons=neurons, 
-                        activations=activations, dropouts=dropouts).double()
-        self.net.apply(weights_init_normal)
-        self.optimiser = optim.SGD(params=self.net.parameters(), lr=0.01, momentum=0.9)
-        self.loss_fn = nn.MSELoss()
+
+        # Set NN to train mode
         self.net.train()
 
-        train_error = 0
+        ##### Start Training #####
         pbar = tqdm(range(self.nb_epoch))
         for i in pbar :
+            # Record train error for each epoch
+            train_error = 0
+            # Iterating all batches
             for j, train_data in enumerate(train_loader):
+                # Clean gradients
                 self.optimiser.zero_grad()
+
+                # Forward pass of a batch
                 x, y_true = train_data
-                # print(x, y)pbar.set_postfix({'num_vowels': num_vowels})
                 y_pred = self.net(x)
+
+                # Backward pass of a batch
                 loss = self.loss_fn(y_pred, y_true)
                 loss.backward()
+
+                # Record training error
                 train_error += loss.item()
+
+                # Update network parameters
                 self.optimiser.step()
+            # Display training error
             train_error /= len(train_loader)
             pbar.set_postfix({'training loss': train_error})
 
@@ -251,16 +334,23 @@ class Regressor():
         X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
         dataset = TensorDataset(X, Y)
         batch_size = 500
+
+        # Instantiate dataloader
         test_loader = DataLoader(dataset, batch_size, shuffle=True)
+
+        # Define our loss function
         self.loss_fn = nn.MSELoss()
+
+        # Set NN to eval mode
         self.net.eval()
 
-        pbar = tqdm(enumerate(test_loader))
         error = 0
+        pbar = tqdm(enumerate(test_loader))
         for j, train_data in pbar:
+            # Predicting label
             x, y_true = train_data
-            # print(x, y)pbar.set_postfix({'num_vowels': num_vowels})
             y_pred = self.net(x)
+            # Calculate loss
             loss = self.loss_fn(y_pred, y_true)
             error += loss.item()
         error = error/len(test_loader)
@@ -294,7 +384,7 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(): 
+def RegressorHyperParameterSearch(regressor, x, y): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -311,7 +401,14 @@ def RegressorHyperParameterSearch():
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
-
+    dummy_pipe = Pipeline([('preprocessor', regressor.feature_pipe),
+                            ('regressor', LinearRegression())])
+    param_grid = {
+    "preprocessor__num__imputer__n_neighbors":[3,5],
+    }
+    grid_search = GridSearchCV(dummy_pipe, param_grid=param_grid, cv=2)
+    x = grid_search.fit(x,y)
+    print(x.best_params_)
     return  # Return the chosen hyper parameters
 
     #######################################################################
@@ -328,7 +425,7 @@ def example_main():
     # Feel free to use another CSV reader tool
     # But remember that LabTS tests take Pandas Dataframe as inputs
     data = pd.read_csv("housing.csv") 
-
+    
     # Spliting input and output
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
@@ -338,6 +435,7 @@ def example_main():
     # You probably want to separate some held-out data 
     # to make sure the model isn't overfitting
     regressor = Regressor(x_train, nb_epoch = 50)
+    # RegressorHyperParameterSearch(regressor, x_train, y_train)
     regressor.fit(x_train, y_train)
     # save_regressor(regressor)
 
