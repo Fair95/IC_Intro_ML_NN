@@ -517,10 +517,11 @@ class Trainer(object):
         if self.shuffle_flag:
             input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
         
+        # Need to consider last batch if not divisible.
         n_samples = input_dataset.shape[0]
         n_batches = n_samples // self.batch_size
-        X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_samples)]
-        y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_samples)]
+        X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
+        y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
 
         for i in range(self.nb_epoch):
             train_loss = 0
