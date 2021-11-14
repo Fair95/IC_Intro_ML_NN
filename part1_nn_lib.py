@@ -514,16 +514,14 @@ class Trainer(object):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        if self.shuffle_flag:
-            input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
-        
-        # Need to consider last batch if not divisible.
-        n_samples = input_dataset.shape[0]
-        n_batches = n_samples // self.batch_size
-        X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
-        y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
-
         for i in range(self.nb_epoch):
+            if self.shuffle_flag:
+                input_dataset, target_dataset = self.shuffle(input_dataset, target_dataset)
+            # Need to consider last batch if not divisible.
+            n_samples = input_dataset.shape[0]
+            n_batches = n_samples // self.batch_size
+            X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
+            y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
             train_loss = 0
             for j in range(n_batches):
                 y_pred = self.network(X[j])
