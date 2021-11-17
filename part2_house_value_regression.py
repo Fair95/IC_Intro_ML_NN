@@ -3,17 +3,22 @@ import pickle
 import numpy as np
 import pandas as pd
 import torch.nn as nn
+from torch.nn.modules import activation
 import torch.optim as optim
 import math
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import StandardScaler
+from numpy.random import default_rng
 
 pd.options.mode.chained_assignment = None
 
 class Regressor(nn.Module):
 
-    def __init__(self, x, nb_epoch = 1000, batch_size = 32, loss='MSE'):
+
+    def __init__(self, x, nb_epoch = 1000, batch_size = 32, loss='MSE', num_layers = 4, num_neurons = 80, activations = 'relu'
+    ,num_dropout=0.4, optimizer='Adam', lr=0.0005, momentum=0.9, L2=0.0):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -33,6 +38,11 @@ class Regressor(nn.Module):
 
         # Replace this code with your own
         super(Regressor, self).__init__()
+
+        #Perserved variables
+        self.ocean_proximity_labels = None
+        self.scaler = StandardScaler()
+
         #Get the sizes of input data and output data to build the network
         X, _ = self._preprocessor(x, training = True)
         self.input_size = X.shape[1]
@@ -47,18 +57,24 @@ class Regressor(nn.Module):
             self.loss_function = torch.nn.CrossEntropyLoss()
 
         #Define the network
-        self.net = nn.Sequential(
-            nn.Linear(self.input_size, 80),
-            nn.ReLU(),
-            nn.Linear(80, 60),
-            nn.ReLU(),
-            nn.Linear(60,20),
-            nn.ReLU(),
-            nn.Linear(20,self.output_size),
-        )
+        activation_abbrev = {'relu': nn.ReLU(), 'sigmoid': nn.Sigmoid(),
+                             'tanh': nn.Tanh(), 'identity':nn.Identity()}
+        self.model = [nn.Linear(self.input_size, num_neurons, bias=True)]
+        neurons_decay = math.floor(num_neurons/num_layers)
+        for i in range(num_layers-1):
+            self.model.append(nn.Dropout(p=num_dropout))
+            self.model.append(activation_abbrev[activations])
+            if i == num_layers-2:
+                self.model.append(nn.Linear(num_neurons - neurons_decay*i,self.output_size, bias=True))
+            else:
+                self.model.append(nn.Linear(num_neurons - neurons_decay*i,num_neurons - neurons_decay*(i+1), bias=True ))
+        self.net = nn.Sequential(*self.model)
 
         #Set the optimizer
-        self.optimizer = optim.Adam(self.net.parameters(), lr=0.001)
+        if optimizer == 'Adam':
+            self.optimizer = optim.Adam(self.net.parameters(), lr=lr, weight_decay=L2)
+        elif optimizer == 'SGD':
+            self.optimizer = optim.SGD(self.net.parameters(),lr=lr, momentum=momentum, weight_decay=L2)
 
         #Check if graphic card is usable, otherwise use cpu
         self.gpu = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -71,10 +87,21 @@ class Regressor(nn.Module):
         #Simply forward the network defined
         x = self.net(x)
         return x
+    
+    def weights_init_normal(m):
+        '''Takes in a module and initializes all linear layers with weight
+        values taken from a normal distribution.'''
+        # for every Linear layer in a model
+        if isinstance(m, nn.Linear):
+            # m.weight.data shoud be taken from a normal distribution
+            torch.nn.init.xavier_uniform_(m.weight)
+            # m.bias.data should be 0
+            torch.nn.init.zeros_(m.bias)
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
     
+
 
     def _preprocessor(self, x, y = None, training = False):
         """ 
@@ -101,47 +128,42 @@ class Regressor(nn.Module):
 
         # Replace this code with your own
         # Return preprocessed x and y, return None for y if it was None
+
+        #Make a copy of the original data
+        xc = x.copy(deep=True)
+        
+        #Get all the attribute index that are NOT categorical
+        number_attribute = x.dtypes[x.dtypes != 'object'].index
+
         if training:
             #Save mean and std and categorical labels of training data
             number_attribute = x.dtypes[x.dtypes != 'object'].index
-            mean = x[number_attribute].mean()
-            std = x[number_attribute].std()
-            ocean_proximity_labels = x.ocean_proximity.unique()
-            mean.to_pickle('mean.pkl')
-            std.to_pickle('std.pkl')
-            np.save('ocean_proximity_labels.npy',ocean_proximity_labels, allow_pickle=True)
-        else:
-            #Restore mean and std and categorical labels for test data
-            mean = pd.read_pickle('mean.pkl')
-            std = pd.read_pickle('std.pkl')
-            ocean_proximity_labels = np.load('ocean_proximity_labels.npy', allow_pickle=True)
+            self.ocean_proximity_labels = x.ocean_proximity.unique()
+            self.scaler.fit(xc[number_attribute])
 
-        #Make a copy of the original data
-        xc = x.copy()
-
-        #Get all the attribute index that are NOT categorical, apply standardization based on training data
-        number_attribute = xc.dtypes[xc.dtypes != 'object'].index
-        xc[number_attribute] = (xc[number_attribute]  - mean) / (std)
+        #Apply scaler based on training data
+        xc[number_attribute] = self.scaler.transform(xc[number_attribute])
 
         #To ensure only all the categorical labels in training data are included in the 1-hot(Using mock up rows)
-        ocean_proximity_labels = ocean_proximity_labels.tolist()
+        ocean_proximity_labels = self.ocean_proximity_labels.tolist()
         count_append = 0
         #In case label showed in training data but not in testing data
         for label in ocean_proximity_labels:
             if label not in xc.ocean_proximity.unique():
-                temp = xc.tail(1).copy()
-                temp.iloc[0,'ocean_proximity'] = label
-                xc.append(temp)
+                temp = xc.tail(1).copy(deep=True)
+                temp.iloc[0,xc.columns.get_loc('ocean_proximity')] = label
+                xc = pd.concat([xc,temp])
                 count_append += 1
         #In case label showed in testing data but not in training data     
         for row in range(0,xc.shape[0]):
             if xc.iloc[row,xc.columns.get_loc('ocean_proximity')] not in ocean_proximity_labels:
                 xc.iloc[row,xc.columns.get_loc('ocean_proximity')] = np.nan
-                
+        
         #Convert categorical attribute into 1-hot
         xc = pd.get_dummies(xc)
         #Drop mock up rows
-        xc.drop(xc.tail(count_append).index,inplace=True)
+        if count_append != 0:
+            xc = xc.iloc[:-count_append,:]
 
         #Fill all the NaN(empty) data
         xc = xc.fillna(xc.mean())
@@ -192,7 +214,7 @@ class Regressor(nn.Module):
                 label = label.type('torch.FloatTensor').to(self.gpu)
                 pred = self.net(data)
                 loss = self.loss_function(pred, label)
-                print(loss.item())
+                #print(loss.item())
                 loss.backward()
                 self.optimizer.step()                      
         return self
@@ -266,7 +288,10 @@ class Regressor(nn.Module):
         #score = math.sqrt(mean_squared_error(Y,prediction))
 
         #Square Root score
-        score = r2_score(Y,prediction)
+        try:
+            score = r2_score(Y,prediction)
+        except:
+            score = -1.0 
 
 
 
@@ -299,7 +324,7 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(): 
+def RegressorHyperParameterSearch(x,y): 
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -316,6 +341,45 @@ def RegressorHyperParameterSearch():
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
+    num_layers = [2,4,6]
+    num_neurons = [40, 80 ,120]
+    num_dropout = [0.2,0.4]
+    optimizer = ['Adam','SGD']
+    learning_rate = [0.01,0.001,0.0005]
+    momentum = [0.9]
+    L2 = [0.0, 1e-5]
+    batch_size = [32]
+    loss=['MSE']
+    activation=['relu','tanh']
+    epoch=[100]
+
+
+    rng = default_rng(seed=1024)
+    shuffle_index = rng.permutation(len(x))
+    x = x.iloc[shuffle_index]
+    y = y.iloc[shuffle_index]
+    x.reset_index(drop=True, inplace=True)
+    y.reset_index(drop=True, inplace=True)
+    train_num = round(4*x.shape[0] / 5)
+    x_train = x.loc[:train_num,:]
+    y_train = y.loc[:train_num,:]
+    x_valid = x.loc[train_num+1:,:]
+    y_valid = y.loc[train_num+1:,:]
+    print("layer,neuron,activation,dropout,optimizer,learning rate,L1/L2,momentum,error")
+    for optim in optimizer:
+        for layer in num_layers:
+            for neuron in num_neurons:
+                for dropout in num_dropout:
+                    for acti in activation:
+                        for lr in learning_rate:
+                            for L in L2:
+                                regressor = Regressor(x, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
+                                regressor.fit(x_train,y_train)
+                                error = regressor.score(x_valid, y_valid)
+                                if optim == 'SGD':
+                                    print(str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
+                                else:
+                                    print(str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
 
     return  # Return the chosen hyper parameters
 
@@ -338,18 +402,20 @@ def example_main():
     x_train = data.loc[:, data.columns != output_label]
     y_train = data.loc[:, [output_label]]
 
-    # Training
-    # This example trains on the whole available dataset. 
-    # You probably want to separate some held-out data 
-    # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 20, batch_size=32, loss='MSE')
-    train_num = round(4*x_train.shape[0] / 5)
-    regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
-    # save_regressor(regressor)
+    # # Training
+    # # This example trains on the whole available dataset. 
+    # # You probably want to separate some held-out data 
+    # # to make sure the model isn't overfitting
+    # regressor = Regressor(x_train, nb_epoch = 1, batch_size=32, loss='MSE')
+    # train_num = round(4*x_train.shape[0] / 5)
+    # regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
+    # # save_regressor(regressor)
 
-    # Error
-    error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
-    print("\nRegressor error: {}\n".format(error))
+    # # Error
+    # error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
+    # print("\nRegressor error: {}\n".format(error))
+
+    RegressorHyperParameterSearch(x_train,y_train)
 
 
 if __name__ == "__main__":
