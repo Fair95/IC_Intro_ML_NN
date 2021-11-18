@@ -144,6 +144,7 @@ class SigmoidLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        # cache_current is the sigmoid output
         return grad_z * self._cache_current * (1-self._cache_current)
 
         #######################################################################
@@ -178,8 +179,8 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        self._cache_current = x > 0
-        return x * self._cache_current
+        self._cache_current = np.maximum(0,x)
+        return self._cache_current
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -202,8 +203,9 @@ class ReluLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        
-        return grad_z * (1. * self._cache_current)
+        result = np.array(grad_z, copy = True)
+        result[self._cache_current<=0] = 0
+        return result
         #######################################################################
         #                       ** END OF YOUR CODE **
         #######################################################################
@@ -255,6 +257,7 @@ class LinearLayer(Layer):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
+        # (batch_size,n_in) @(n_in,n_out) = (batch_size,n_out)
         self._cache_current = x
         return x @ self._W + self._b
         #######################################################################
@@ -520,8 +523,19 @@ class Trainer(object):
             # Need to consider last batch if not divisible.
             n_samples = input_dataset.shape[0]
             n_batches = n_samples // self.batch_size
-            X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
-            y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
+            ######## This deals with the case where the last few samples are not enough for a complete batch, 
+            ######## we add them in the last batch
+            X = []
+            Y = []
+            for i in range(n_batches):
+                if i == n_batches-1:
+                    X.append(input_dataset[i*self.batch_size:])
+                    y.append(target_dataset[i*self.batch_size:])
+                else:
+                    X.append(input_dataset[i*self.batch_size:(i+1)*self.batch_size])
+                    y.append(target_dataset[i*self.batch_size:(i+1)*self.batch_size])
+            # X = [input_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
+            # y = [target_dataset[i*self.batch_size:(i+1)*self.batch_size] for i in range(n_batches)]
             train_loss = 0
             for j in range(n_batches):
                 y_pred = self.network(X[j])
