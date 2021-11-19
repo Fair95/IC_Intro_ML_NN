@@ -9,7 +9,7 @@ import math
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from numpy.random import default_rng
 
 pd.options.mode.chained_assignment = None
@@ -42,8 +42,11 @@ class Regressor(nn.Module):
         self.ocean_proximity_labels = None
         if scaler == 'Standard':
             self.scaler = StandardScaler()
-        else:
+        elif scaler == 'MINMAX':
             self.scaler = MinMaxScaler()
+        elif scaler == 'Robust':
+            self.scaler = RobustScaler()
+
 
         #Get the sizes of input data and output data to build the network
         X, _ = self._preprocessor(x, training = True)
