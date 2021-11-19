@@ -9,14 +9,14 @@ import math
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from numpy.random import default_rng
 
 pd.options.mode.chained_assignment = None
 
 class Regressor(nn.Module):
     
-    def __init__(self, x, nb_epoch = 1000, batch_size = 32, loss='MSE', num_layers = 4, num_neurons = 80, activations = 'relu'
+    def __init__(self, x, scaler = 'Standard', nb_epoch = 1000, batch_size = 32, loss='MSE', num_layers = 4, num_neurons = 80, activations = 'relu'
     ,num_dropout=0.4, optimizer='Adam', lr=0.0005, momentum=0.9, L2=0.0):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
@@ -40,7 +40,10 @@ class Regressor(nn.Module):
 
         #Perserved variables
         self.ocean_proximity_labels = None
-        self.scaler = StandardScaler()
+        if scaler == 'Standard':
+            self.scaler = StandardScaler()
+        else:
+            self.scaler = MinMaxScaler()
 
         #Get the sizes of input data and output data to build the network
         X, _ = self._preprocessor(x, training = True)
@@ -341,10 +344,11 @@ def RegressorHyperParameterSearch(x,y):
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
-    num_layers = [2,4,6]
-    num_neurons = [160]
+    scaler = ['MINMAX']
+    num_layers = [2,4,6,8]
+    num_neurons = [40,80,120,160]
     num_dropout = [0.2,0.4]
-    optimizer = ['SGD']
+    optimizer = ['Adam','SGD']
     learning_rate = [0.01,0.001,0.0005]
     momentum = [0.9]
     L2 = [0.0, 1e-5]
@@ -352,7 +356,6 @@ def RegressorHyperParameterSearch(x,y):
     loss=['MSE']
     activation=['relu','tanh']
     epoch=[100]
-
 
     rng = default_rng(seed=1024)
     shuffle_index = rng.permutation(len(x))
@@ -365,21 +368,22 @@ def RegressorHyperParameterSearch(x,y):
     y_train = y.loc[:train_num,:]
     x_valid = x.loc[train_num+1:,:]
     y_valid = y.loc[train_num+1:,:]
-    print("layer,neuron,activation,dropout,optimizer,learning rate,L1/L2,momentum,error")
-    for optim in optimizer:
-        for layer in num_layers:
-            for neuron in num_neurons:
-                for dropout in num_dropout:
-                    for acti in activation:
-                        for lr in learning_rate:
-                            for L in L2:
-                                regressor = Regressor(x, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
-                                regressor.fit(x_train,y_train)
-                                error = regressor.score(x_valid, y_valid)
-                                if optim == 'SGD':
-                                    print(str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
-                                else:
-                                    print(str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
+    print("scaler,layer,neuron,activation,dropout,optimizer,learning rate,L1/L2,momentum,error")
+    for s in scaler:
+        for optim in optimizer:
+            for layer in num_layers:
+                for neuron in num_neurons:
+                    for dropout in num_dropout:
+                        for acti in activation:
+                            for lr in learning_rate:
+                                for L in L2:
+                                    regressor = Regressor(x, scaler=s, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
+                                    regressor.fit(x_train,y_train)
+                                    error = regressor.score(x_valid, y_valid)
+                                    if optim == 'SGD':
+                                        print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
+                                    else:
+                                        print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
 
     return  # Return the chosen hyper parameters
 
