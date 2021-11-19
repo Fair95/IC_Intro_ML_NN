@@ -15,8 +15,7 @@ from numpy.random import default_rng
 pd.options.mode.chained_assignment = None
 
 class Regressor(nn.Module):
-
-
+    
     def __init__(self, x, nb_epoch = 1000, batch_size = 32, loss='MSE', num_layers = 4, num_neurons = 80, activations = 'relu'
     ,num_dropout=0.4, optimizer='Adam', lr=0.0005, momentum=0.9, L2=0.0):
         # You can add any input parameters you need
@@ -69,6 +68,7 @@ class Regressor(nn.Module):
             else:
                 self.model.append(nn.Linear(num_neurons - neurons_decay*i,num_neurons - neurons_decay*(i+1), bias=True ))
         self.net = nn.Sequential(*self.model)
+        #self.net.apply(self.weights_init_normal)
 
         #Set the optimizer
         if optimizer == 'Adam':
@@ -88,7 +88,7 @@ class Regressor(nn.Module):
         x = self.net(x)
         return x
     
-    def weights_init_normal(m):
+    def weights_init_normal(self, m):
         '''Takes in a module and initializes all linear layers with weight
         values taken from a normal distribution.'''
         # for every Linear layer in a model
@@ -342,9 +342,9 @@ def RegressorHyperParameterSearch(x,y):
     #                       ** START OF YOUR CODE **
     #######################################################################
     num_layers = [2,4,6]
-    num_neurons = [40, 80 ,120]
+    num_neurons = [160]
     num_dropout = [0.2,0.4]
-    optimizer = ['Adam','SGD']
+    optimizer = ['SGD']
     learning_rate = [0.01,0.001,0.0005]
     momentum = [0.9]
     L2 = [0.0, 1e-5]
