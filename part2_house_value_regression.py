@@ -379,7 +379,7 @@ def RegressorHyperParameterSearch(x,y):
     activation=['relu','tanh']
     epoch=[100]
 
-    scaler = ['Standard']
+    scaler = ['MINMAX']
     num_layers = [6]
     num_neurons = [120]
     num_dropout = [0.2]
