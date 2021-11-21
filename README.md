@@ -16,7 +16,7 @@
 - MultiLayerNetwork
 - Trainer
 #### Functions:
-- __init__()
+- \__init__()
 - forward()
 - backward()
 - update_params
@@ -28,7 +28,7 @@
 - LinearRegressorModel
 - Regressor
 #### Functions:
-- __init__()
+- \__init__()
 - _preprocessor()
 - fit()
 - predict()
@@ -41,7 +41,7 @@
 * Implemented in `part1_nn_lib.py`
 #### 1.1 Implement a linear layer.
 * In class LinearLayer:
-- __init__(): Constructor
+- \__init__(): Constructor
 - forward(): Forward pass method
 - backward(): Backward pass method
 - update_params: Parameter update method
@@ -51,19 +51,19 @@
 - backward(): Backward pass method
 #### 1.3 Implement a multi-layer network.
 * In class MultiLayerNetwork:
-- __init__(): Constructor
+- \__init__(): Constructor
 - forward(): Forward pass method
 - backward(): Backward pass method
 - update_params: Parameter update method
 #### 1.4 Implement a trainer.
 * In class Trainer:
-- __init__(): Constructor
+- \__init__(): Constructor
 - shuffle(): Data shuffling
 - train(): Main training loop
 - eval_loss(): Computing evaluation loss
 #### 1.5 Implement a preprocessor.
 * In class Preprocessor:
-- __init__(): Constructor
+- \__init__(): Constructor
 - apply(): Apply method
 - revert(): Revert method
 
@@ -83,7 +83,7 @@
 
 #### 2.1 Implement an architecture for regression
 - _preprocessor(): Preprocessor method
-- __init__(): Constructor method
+- \__init__(): Constructor method
 - fit(): Model-training method
 #### 2.2 Set up model evaluation
 - predict(): Prediction method
