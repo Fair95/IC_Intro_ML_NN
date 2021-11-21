@@ -19,8 +19,8 @@
 - \__init__()
 - forward()
 - backward()
-- update_params
-- shuffle
+- update_params()
+- shuffle()
 - ...
 ### `part2_house_value_regression.py`
 ### Part 2 of the coursework where we created and trained a neural network for regression. Check this file for imformation about
@@ -44,7 +44,7 @@
 - \__init__(): Constructor
 - forward(): Forward pass method
 - backward(): Backward pass method
-- update_params: Parameter update method
+- update_params(): Parameter update method
 #### 1.2 Implement activation function classes.
 * In class SigmoidLayer and ReluLayer:
 - forward(): Forward pass method
@@ -54,7 +54,7 @@
 - \__init__(): Constructor
 - forward(): Forward pass method
 - backward(): Backward pass method
-- update_params: Parameter update method
+- update_params(): Parameter update method
 #### 1.4 Implement a trainer.
 * In class Trainer:
 - \__init__(): Constructor
