@@ -311,6 +311,9 @@ class Regressor(nn.Module):
         #Square Root score
         try:
             score = r2_score(Y,result)
+            print(str(score))
+            score = mean_squared_error(Y,result,squared=False)
+            print(str(score))
         except:
             score = -1.0 
 
@@ -428,14 +431,15 @@ def example_main():
     # # This example trains on the whole available dataset. 
     # # You probably want to separate some held-out data 
     # # to make sure the model isn't overfitting
-    regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
+    #regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
     train_num = round(4*x_train.shape[0] / 5)
-    regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
-    save_regressor(regressor)
+    # regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
+    # save_regressor(regressor)
 
+    regressor = load_regressor()
     # # Error
     error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
-    print("\nRegressor error: {}\n".format(error))
+    #print("\nRegressor error: {}\n".format(error))
 
     #RegressorHyperParameterSearch(x_train,y_train)
 
