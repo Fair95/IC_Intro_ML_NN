@@ -147,6 +147,9 @@ class Regressor(nn.Module):
             self.ocean_proximity_labels = x.ocean_proximity.unique()
             self.scaler.fit(xc[number_attribute])
 
+        #Fill all the NaN(empty) data
+        xc[number_attribute] = xc[number_attribute].fillna(xc[number_attribute].mean())
+
         #Apply scaler based on training data
         xc[number_attribute] = self.scaler.transform(xc[number_attribute])
 
@@ -171,8 +174,6 @@ class Regressor(nn.Module):
         if count_append != 0:
             xc = xc.iloc[:-count_append,:]
 
-        #Fill all the NaN(empty) data
-        xc = xc.fillna(xc.mean())
 
         #Convert the data to numpy array
         xc = np.array(xc, dtype=np.float32)
@@ -378,6 +379,19 @@ def RegressorHyperParameterSearch(x,y):
     activation=['relu','tanh']
     epoch=[100]
 
+    scaler = ['Standard']
+    num_layers = [6]
+    num_neurons = [120]
+    num_dropout = [0.2]
+    optimizer = ['Adam']
+    learning_rate = [0.001]
+    momentum = [0.9]
+    L2 = [1e-5]
+    batch_size = [32]
+    loss=['MSE']
+    activation=['relu']
+    epoch=[100]
+
 
     rng = default_rng(seed=1024)
     shuffle_index = rng.permutation(len(x))
@@ -406,6 +420,7 @@ def RegressorHyperParameterSearch(x,y):
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
                                     else:
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
+    save_regressor(regressor)
     return  # Return the chosen hyper parameters
 
     #######################################################################
@@ -431,17 +446,17 @@ def example_main():
     # # This example trains on the whole available dataset. 
     # # You probably want to separate some held-out data 
     # # to make sure the model isn't overfitting
-    #regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
-    train_num = round(4*x_train.shape[0] / 5)
+    # regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
+    # train_num = round(4*x_train.shape[0] / 5)
     # regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
     # save_regressor(regressor)
 
-    regressor = load_regressor()
+    #regressor = load_regressor()
     # # Error
-    error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
+    #error = regressor.score(x_train.iloc[train_num+1:,:], y_train.iloc[train_num+1:,:])
     #print("\nRegressor error: {}\n".format(error))
 
-    #RegressorHyperParameterSearch(x_train,y_train)
+    RegressorHyperParameterSearch(x_train,y_train)
 
 
 if __name__ == "__main__":
