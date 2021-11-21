@@ -16,8 +16,8 @@ pd.options.mode.chained_assignment = None
 
 class Regressor(nn.Module):
     
-    def __init__(self, x, scaler = 'Standard', nb_epoch = 1000, batch_size = 32, loss='MSE', num_layers = 4, num_neurons = 80, activations = 'relu'
-    ,num_dropout=0.4, optimizer='Adam', lr=0.0005, momentum=0.9, L2=0.0):
+    def __init__(self, x, nb_epoch = 1000, scaler = 'Standard', batch_size = 32, loss='MSE', num_layers = 6, num_neurons = 120, activations = 'relu'
+    ,num_dropout=0.2, optimizer='Adam', lr=0.001, momentum=0.9, L2=0.0):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
