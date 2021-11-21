@@ -255,6 +255,8 @@ class Regressor(nn.Module):
         pred = self.net(X)
         #convert to numpy and return
         result = pred.detach().numpy()
+        #Convert the log(result) back to label
+        result = np.exp(result)
         return result
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -303,7 +305,6 @@ class Regressor(nn.Module):
         result = np.concatenate(result)
 
         #Convert the log(label) back to label
-        result = np.exp(result)
         Y = np.exp(Y)
 
         #RMSE score
@@ -312,13 +313,8 @@ class Regressor(nn.Module):
         #Square Root score
         try:
             score = r2_score(Y,result)
-            print(str(score))
-            score = mean_squared_error(Y,result,squared=False)
-            print(str(score))
         except:
             score = -1.0 
-
-
 
         return score # Replace this code with your own
 
@@ -379,20 +375,6 @@ def RegressorHyperParameterSearch(x,y):
     activation=['relu','tanh']
     epoch=[100]
 
-    scaler = ['MINMAX']
-    num_layers = [6]
-    num_neurons = [120]
-    num_dropout = [0.2]
-    optimizer = ['Adam']
-    learning_rate = [0.001]
-    momentum = [0.9]
-    L2 = [1e-5]
-    batch_size = [32]
-    loss=['MSE']
-    activation=['relu']
-    epoch=[100]
-
-
     rng = default_rng(seed=1024)
     shuffle_index = rng.permutation(len(x))
     x = x.iloc[shuffle_index]
@@ -420,7 +402,6 @@ def RegressorHyperParameterSearch(x,y):
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
                                     else:
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
-    save_regressor(regressor)
     return  # Return the chosen hyper parameters
 
     #######################################################################
