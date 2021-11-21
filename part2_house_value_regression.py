@@ -17,7 +17,7 @@ pd.options.mode.chained_assignment = None
 class Regressor(nn.Module):
     
     def __init__(self, x, nb_epoch = 1000, scaler = 'Standard', batch_size = 32, loss='MSE', num_layers = 6, num_neurons = 120, activations = 'relu'
-    ,num_dropout=0.2, optimizer='Adam', lr=0.001, momentum=0.9, L2=0.0):
+    ,num_dropout=0.2, optimizer='Adam', lr=0.001, momentum=0.9, L2=1e-5):
         # You can add any input parameters you need
         # Remember to set them with a default value for LabTS tests
         """ 
@@ -83,7 +83,7 @@ class Regressor(nn.Module):
             self.optimizer = optim.SGD(self.net.parameters(),lr=lr, momentum=momentum, weight_decay=L2)
 
         #Check if graphic card is usable, otherwise use cpu
-        self.gpu = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        self.gpu = torch.device('cpu')
 
         #Send the network to gpu or cpu
         self.net = self.net.to(self.gpu)
@@ -246,19 +246,14 @@ class Regressor(nn.Module):
         #######################################################################
         #                       ** START OF YOUR CODE **
         #######################################################################
-        #X, _ = self._preprocessor(x, training = False) # Do not forget
-        X = x
-        #Put the test data into DataLoader
-        validation_data = DataLoader([[X[i]] for i in range(X.shape[0])], batch_size=1, shuffle=False)
-        #Use a numpy array to store prediction labels
-        result = np.zeros((X.shape[0],1))
-        #Convert the network to eval mode
-        self.net.eval()
-        for i, [data] in enumerate(validation_data):
-            data = data.type('torch.FloatTensor').to(self.gpu)
-            pred = self.net(data)
-            #pred = np.exp(pred)
-            result[i,0] = pred
+        #preprocess
+        X, _ = self._preprocessor(x, training = False) # Do not forget
+        #convert input data into tensor
+        X = torch.tensor(X)
+        #input to net
+        pred = self.net(X)
+        #convert to numpy and return
+        result = pred.detach().numpy()
         return result
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -283,11 +278,31 @@ class Regressor(nn.Module):
         #######################################################################
 
         X, Y = self._preprocessor(x, y = y, training = False) # Do not forget
-        #make prediction on the testing data
-        prediction = self.predict(X)
+
+        #Convert the network to eval mode
+        self.net.eval()
+
+        #List contain all the prediction results
+        result = []
+
+        total_batch = math.ceil(x.shape[0]/self.batch_size)
+
+        for i in range(total_batch):
+            #split raw data into batches
+            if i == total_batch-1:
+                data = x.iloc[i*self.batch_size:,:]
+            else: 
+                data = x.iloc[i*self.batch_size:(i+1)*self.batch_size,:]
+            #make prediction on the testing data
+            prediction = self.predict(data)
+            #collect the prediction results
+            result.append(prediction)
+
+        #concatenate the result to compute the score
+        result = np.concatenate(result)
 
         #Convert the log(label) back to label
-        prediction = np.exp(prediction)
+        result = np.exp(result)
         Y = np.exp(Y)
 
         #RMSE score
@@ -295,7 +310,7 @@ class Regressor(nn.Module):
 
         #Square Root score
         try:
-            score = r2_score(Y,prediction)
+            score = r2_score(Y,result)
         except:
             score = -1.0 
 
@@ -388,7 +403,6 @@ def RegressorHyperParameterSearch(x,y):
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
                                     else:
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
-    save_regressor(regressor)
     return  # Return the chosen hyper parameters
 
     #######################################################################
@@ -414,16 +428,16 @@ def example_main():
     # # This example trains on the whole available dataset. 
     # # You probably want to separate some held-out data 
     # # to make sure the model isn't overfitting
-    # regressor = Regressor(x_train, nb_epoch = 1, batch_size=32, loss='MSE')
-    # train_num = round(4*x_train.shape[0] / 5)
-    # regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
-    # # save_regressor(regressor)
+    regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
+    train_num = round(4*x_train.shape[0] / 5)
+    regressor.fit(x_train.loc[:train_num,:], y_train.loc[:train_num,:])
+    save_regressor(regressor)
 
     # # Error
-    # error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
-    # print("\nRegressor error: {}\n".format(error))
+    error = regressor.score(x_train.loc[train_num+1:,:], y_train.loc[train_num+1:,:])
+    print("\nRegressor error: {}\n".format(error))
 
-    RegressorHyperParameterSearch(x_train,y_train)
+    #RegressorHyperParameterSearch(x_train,y_train)
 
 
 if __name__ == "__main__":
