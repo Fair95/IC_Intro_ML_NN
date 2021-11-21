@@ -526,7 +526,7 @@ class Trainer(object):
             ######## This deals with the case where the last few samples are not enough for a complete batch, 
             ######## we add them in the last batch
             X = []
-            Y = []
+            y = []
             for i in range(n_batches):
                 if i == n_batches-1:
                     X.append(input_dataset[i*self.batch_size:])
