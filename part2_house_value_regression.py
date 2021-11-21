@@ -347,7 +347,7 @@ def RegressorHyperParameterSearch(x,y):
     #######################################################################
     #                       ** START OF YOUR CODE **
     #######################################################################
-    scaler = ['MINMAX']
+    scaler = ['Standard','MINMAX','Robust']
     num_layers = [2,4,6,8]
     num_neurons = [40,80,120,160]
     num_dropout = [0.2,0.4]
@@ -359,6 +359,7 @@ def RegressorHyperParameterSearch(x,y):
     loss=['MSE']
     activation=['relu','tanh']
     epoch=[100]
+
 
     rng = default_rng(seed=1024)
     shuffle_index = rng.permutation(len(x))
@@ -387,7 +388,7 @@ def RegressorHyperParameterSearch(x,y):
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
                                     else:
                                         print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
-
+    save_regressor(regressor)
     return  # Return the chosen hyper parameters
 
     #######################################################################
