@@ -208,11 +208,14 @@ class Regressor(nn.Module):
         #######################################################################
         #Get training data and labels
         X, Y = self._preprocessor(x, y = y, training = True) # Do not forget
+
         #Put the data into DataLoader
         train_data = DataLoader([[X[i], Y[i]] for i in range(X.shape[0])], batch_size=self.batch_size, shuffle=True)
 
         #Convert the network to train mode
         self.net.train()
+        train_loss_list = []
+        val_loss_list = []
         #train
         for epoch in range(self.nb_epoch):
             for i, [data, label] in enumerate(train_data):
@@ -221,10 +224,26 @@ class Regressor(nn.Module):
                 label = label.type('torch.FloatTensor').to(self.gpu)
                 pred = self.net(data)
                 loss = self.loss_function(pred, label)
-                #print(loss.item())
+                # print(loss.item())
                 loss.backward()
-                self.optimizer.step()                      
-        return self
+                self.optimizer.step()
+            if epoch % 10 == 0:
+                print('Complete' ,epoch, 'Epochs')
+                print('The current loss is',loss.item())
+            # This is only for plotting the learning curves
+            train_loss_list.append(loss.item())
+
+        train_loss_list = np.array(train_loss_list)
+        plt.plot(train_loss_list)
+        plt.title('Learning Curve')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.show()
+
+
+
+        # return self
+        return train_loss_list
 
         #######################################################################
         #                       ** END OF YOUR CODE **
@@ -345,7 +364,7 @@ def load_regressor():
 
 
 
-def RegressorHyperParameterSearch(x,y): 
+def RegressorHyperParameterSearch(x_train,y_train,x_valid,y_valid):
     # Ensure to add whatever inputs you deem necessary to this function
     """
     Performs a hyper-parameter for fine-tuning the regressor implemented 
@@ -364,44 +383,64 @@ def RegressorHyperParameterSearch(x,y):
     #######################################################################
     scaler = ['Standard','MINMAX','Robust']
     num_layers = [2,4,6,8]
-    num_neurons = [40,80,120,160]
+    num_neurons = [32,64,128,256]
     num_dropout = [0.2,0.4]
     optimizer = ['Adam','SGD']
     learning_rate = [0.01,0.001,0.0005]
     momentum = [0.9]
     L2 = [0.0, 1e-5]
-    batch_size = [32]
+    batch_size = [32,64]
     loss=['MSE']
     activation=['relu','tanh']
     epoch=[100]
 
-    rng = default_rng(seed=1024)
-    shuffle_index = rng.permutation(len(x))
-    x = x.iloc[shuffle_index]
-    y = y.iloc[shuffle_index]
-    x.reset_index(drop=True, inplace=True)
-    y.reset_index(drop=True, inplace=True)
-    train_num = round(4*x.shape[0] / 5)
-    x_train = x.loc[:train_num,:]
-    y_train = y.loc[:train_num,:]
-    x_valid = x.loc[train_num+1:,:]
-    y_valid = y.loc[train_num+1:,:]
+    # rng = default_rng(seed=1024)
+    # shuffle_index = rng.permutation(len(x))
+    # x = x.iloc[shuffle_index]
+    # y = y.iloc[shuffle_index]
+    # x.reset_index(drop=True, inplace=True)
+    # y.reset_index(drop=True, inplace=True)
+    # train_num = round(4*x.shape[0] / 5)
+    #
+    #
+    # x_train = x.loc[:train_num,:]
+    # y_train = y.loc[:train_num,:]
+    # x_valid = x.loc[train_num+1:,:]
+    # y_valid = y.loc[train_num+1:,:]
     print("scaler,layer,neuron,activation,dropout,optimizer,learning rate,L1/L2,momentum,error")
+    plotting_list = []
+    score_list = []
     for s in scaler:
-        for optim in optimizer:
-            for layer in num_layers:
-                for neuron in num_neurons:
-                    for dropout in num_dropout:
-                        for acti in activation:
-                            for lr in learning_rate:
-                                for L in L2:
-                                    regressor = Regressor(x_train, scaler=s, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
-                                    regressor.fit(x_train,y_train)
-                                    error = regressor.score(x_valid, y_valid)
-                                    if optim == 'SGD':
-                                        print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
-                                    else:
-                                        print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
+        regressor = Regressor(x_train, scaler=s, nb_epoch = 100, batch_size=32, loss='MSE', num_layers=2, num_neurons=32, activations='relu', num_dropout=0.2, optimizer='Adam', lr=0.001,  L2=1e-5, momentum=0.9)
+        learning_curve = regressor.fit(x_train,y_train)
+        plotting_list.append(learning_curve)
+        score = regressor.score(x_valid,y_valid)
+        score_list.append(score)
+
+    for i,s in enumerate(scaler):
+        learning_curve = plotting_list[i]
+        plt.plot(learning_curve,label = 'scalar method ' + s)
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.title('Learning Curve with different parameters')
+    plt.show()
+    print(score_list)
+    # for s in scaler:
+    #     for optim in optimizer:
+    #         for layer in num_layers:
+    #             for neuron in num_neurons:
+    #                 for dropout in num_dropout:
+    #                     for acti in activation:
+    #                         for lr in learning_rate:
+    #                             for L in L2:
+    #                                 regressor = Regressor(x_train, scaler=s, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
+    #                                 regressor.fit(x_train,y_train)
+    #                                 error = regressor.score(x_valid, y_valid)
+    #                                 if optim == 'SGD':
+    #                                     print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + str(momentum[0])+ "," + str(error))
+    #                                 else:
+    #                                     print(s + "," + str(layer) + "," + str(neuron) + "," + acti + "," + str(dropout) + "," + optim + "," + str(lr) + "," + str(L) + "," + "," + str(error))
     return  # Return the chosen hyper parameters
 
     #######################################################################
@@ -420,9 +459,33 @@ def example_main():
     data = pd.read_csv("housing.csv") 
 
     # Spliting input and output
-    x_train = data.loc[:, data.columns != output_label]
-    y_train = data.loc[:, [output_label]]
+    x = data.loc[:, data.columns != output_label]
+    y = data.loc[:, [output_label]]
 
+    rng = default_rng(seed=1024)
+    shuffle_index = rng.permutation(len(x))
+    x = x.iloc[shuffle_index]
+    y = y.iloc[shuffle_index]
+    x.reset_index(drop=True, inplace=True)
+    y.reset_index(drop=True, inplace=True)
+    train_num = round(4 * x.shape[0] / 5)
+
+    x_train = x.loc[:train_num, :]
+    y_train = y.loc[:train_num, :]
+    x_valid = x.loc[train_num + 1:, :]
+    y_valid = y.loc[train_num + 1:, :]
+
+    # regressor = Regressor(x_train, nb_epoch = 100, batch_size=32, loss='MSE')
+    # learning_curve = regressor.fit(x_train,y_train)
+    #
+    # score = regressor.score(x_valid, y_valid)
+    # print(score)
+    #
+    # plt.plot(learning_curve)
+    # plt.title('Learning Curve')
+    # plt.xlabel('Epochs')
+    # plt.ylabel('Loss')
+    # plt.show()
     # # Training
     # # This example trains on the whole available dataset. 
     # # You probably want to separate some held-out data 
@@ -437,7 +500,7 @@ def example_main():
     #error = regressor.score(x_train.iloc[train_num+1:,:], y_train.iloc[train_num+1:,:])
     #print("\nRegressor error: {}\n".format(error))
 
-    RegressorHyperParameterSearch(x_train,y_train)
+    RegressorHyperParameterSearch(x_train,y_train,x_valid,y_valid)
 
 
 if __name__ == "__main__":
