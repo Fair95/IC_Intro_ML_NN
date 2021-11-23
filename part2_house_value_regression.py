@@ -395,7 +395,7 @@ def RegressorHyperParameterSearch(x,y):
                         for acti in activation:
                             for lr in learning_rate:
                                 for L in L2:
-                                    regressor = Regressor(x, scaler=s, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
+                                    regressor = Regressor(x_train, scaler=s, nb_epoch = epoch[0], batch_size=batch_size[0], loss=loss[0], num_layers=layer, num_neurons=neuron, activations=acti, num_dropout=dropout, optimizer=optim, lr=lr,  L2=L, momentum=momentum[0])
                                     regressor.fit(x_train,y_train)
                                     error = regressor.score(x_valid, y_valid)
                                     if optim == 'SGD':
