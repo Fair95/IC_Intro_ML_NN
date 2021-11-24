@@ -11,6 +11,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from numpy.random import default_rng
+import time
 
 pd.options.mode.chained_assignment = None
 
@@ -234,13 +235,11 @@ class Regressor(nn.Module):
             train_loss_list.append(loss.item())
 
         train_loss_list = np.array(train_loss_list)
-        plt.plot(train_loss_list)
-        plt.title('Learning Curve')
-        plt.xlabel('Epochs')
-        plt.ylabel('Loss')
-        plt.show()
-
-
+        # plt.plot(train_loss_list)
+        # plt.title('Learning Curve')
+        # plt.xlabel('Epochs')
+        # plt.ylabel('Loss')
+        # plt.show()
 
         # return self
         return train_loss_list
@@ -410,16 +409,20 @@ def RegressorHyperParameterSearch(x_train,y_train,x_valid,y_valid):
     print("scaler,layer,neuron,activation,dropout,optimizer,learning rate,L1/L2,momentum,error")
     plotting_list = []
     score_list = []
-    for s in scaler:
-        regressor = Regressor(x_train, scaler=s, nb_epoch = 100, batch_size=32, loss='MSE', num_layers=2, num_neurons=32, activations='relu', num_dropout=0.2, optimizer='Adam', lr=0.001,  L2=1e-5, momentum=0.9)
+    for l in num_layers:
+        regressor = Regressor(x_train, scaler='Robust', nb_epoch = 100, batch_size=32, loss='MSE', num_layers=l, num_neurons=32, activations='relu', num_dropout=0.2, optimizer='Adam', lr=0.001,  L2=1e-5, momentum=0.9)
+        start = time.time()
         learning_curve = regressor.fit(x_train,y_train)
+        end = time.time()
         plotting_list.append(learning_curve)
         score = regressor.score(x_valid,y_valid)
         score_list.append(score)
+        print('Time used ', end-start)
+        print('Complete partially')
 
-    for i,s in enumerate(scaler):
+    for i,l in enumerate(num_layers):
         learning_curve = plotting_list[i]
-        plt.plot(learning_curve,label = 'scalar method ' + s)
+        plt.plot(learning_curve,label = 'Number of Layers = ' + str(l))
         plt.xlabel('Epochs')
         plt.ylabel('Loss')
         plt.legend()
