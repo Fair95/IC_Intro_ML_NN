@@ -40,7 +40,7 @@
 ### Our best model in part 2 saved as a pickle file.
 
 ### `result.csv`
-### The training result in a csv file.
+### The training evaluation result in HyperparameterSearch section in a csv file.
 
 ## III. Implementation of the Neural Network (If you are interested...)
 ### Part 1: Create a neural network mini-library
